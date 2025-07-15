@@ -104,10 +104,10 @@ def generate_resume():
         # Use the provided API key if available; otherwise, use default
         if HAS_GENAI:
             local_client = genai.Client(api_key=provided_api_key) if provided_api_key else default_client
-            if not local_client:
-                return jsonify({"error": "No valid API client available"}), 500
+            if not local_client or (provided_api_key is None and DEFAULT_GENAI_API_KEY == "YOUR_DEFAULT_API_KEY"):
+                return jsonify({"error": "No valid Gemini API key available. Please provide your own Gemini API key to use this feature."}), 400
         else:
-            local_client = None
+            return jsonify({"error": "Google Gemini AI library is not installed. Please contact the administrator or provide a valid API key."}), 500
 
         try:
             logging.info("Starting resume processing")
@@ -166,6 +166,9 @@ def generate_resume():
 
             return jsonify(response_data), 200
 
+        except ValueError as ve:
+            # Custom error for missing API key
+            return jsonify({"error": str(ve)}), 400
         except Exception as e:
             logging.exception("An error occurred during resume generation")
             error_message = str(e) if str(e) else "An unknown error occurred during processing"
@@ -235,11 +238,12 @@ def mock_process_resume(resume_content, job_description=None):
 def process_with_gemini(client, resume_content, job_description=None):
     """
     Sends the resume content (and optional job description) to Gemini AI for processing and formatting into LaTeX.
-    Falls back to mock processing if Gemini is not available.
+    If no valid client is available, prompt the user to provide their API key.
     """
     if not client or not HAS_GENAI:
-        logging.warning("Using mock implementation for resume processing")
-        return mock_process_resume(resume_content, job_description)
+        logging.warning("No valid Gemini API client available. Prompting user for API key.")
+        # Instead of returning dummy output, return a special error message
+        raise ValueError("No valid Gemini API key available. Please provide your own Gemini API key to use this feature.")
     
     try:
         logging.info("Sending resume content to Gemini AI for processing...")
